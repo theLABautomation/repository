@@ -1,0 +1,119 @@
+<script type="text/x-red" data-template-name="hue-rules">
+    <div class="form-row">
+        <label for="node-input-name"><i class="fa fa-tag"></i> <span data-i18n="hue-rules.config.name"></span></label>
+        <input type="text" id="node-input-name" data-i18n="[placeholder]hue-rules.config.input-name">
+    </div>
+    <div class="form-row">
+        <label for="node-input-bridge"><i class="fa fa-server"></i> Bridge</label>
+        <input type="text" id="node-input-bridge">
+    </div>
+    <div class="form-row">
+        <label for="node-input-ruleid"><i class="fa fa-tasks"></i> <span data-i18n="hue-rules.config.rule"></span></label>
+        <div style="display: inline-block; position: relative; width: 70%; height: 20px;">
+            <div style="position: absolute; left: 0px; right: 40px;">
+                <input type="text" id="node-input-ruleid" placeholder="1" style="width: 100%"/>
+            </div>
+            <a id="node-config-input-scan-rules" class="editor-button" style="position: absolute; right: 0px; top: 0px;">
+                <i class="fa fa-search"></i>
+            </a>
+        </div>
+    </div>
+    <div class="form-row">
+        <label for="node-input-skipevents"><i class="fa fa-sign-out"></i> <span data-i18n="hue-rules.config.skipevents"></span></label>
+        <input type="checkbox" id="node-input-skipevents" style="display:inline-block; width:22px; vertical-align:baseline;"><span data-i18n="hue-rules.config.skipevents-node"></span>
+        </label>
+    </div>
+</script>
+
+<script type="text/javascript">
+    RED.nodes.registerType('hue-rules',{
+        category: 'HueMagic',
+        color: '#bddb37',
+        defaults: {
+            name: {value:""},
+            bridge: {type: "hue-bridge", required: true},
+            ruleid: {value:"", required: true, validate: RED.validators.number()},
+            skipevents: {value: false}
+        },
+        inputs: 1,
+        outputs: 1,
+        inputLabels: function() {
+            return this._("hue-rules.node.input");
+        },
+        outputLabels: function() {
+            return this._("hue-rules.node.output");
+        },
+        align: 'right',
+        icon: "hue-rules.png",
+        paletteLabel: function() {
+            return this._("hue-rules.node.title");
+        },
+        label: function() {
+            return this.name || this._("hue-rules.node.title");
+        },
+        oneditprepare: function()
+        {
+            var scope = this;
+
+            function manualRuleID()
+            {
+                var current = $('#node-input-ruleid').val();
+                $('#node-input-ruleid').replaceWith('<input type="text" id="node-input-ruleid" style="width: 100%"/>');
+                $('#node-input-ruleid').val(current);
+            }
+
+            function searchAndSelectRuleID()
+            {
+                var current = $('#node-input-ruleid').val();
+                $('#node-input-ruleid').replaceWith('<select id="node-input-ruleid" style="width: 100%"></select>');
+                $('#node-input-ruleid').append('<option selected="selected" value="null">'+scope._("hue-rules.config.searching")+'</option>');
+
+                var bridgeConfig = RED.nodes.node($('#node-input-bridge option:selected').val());
+                $.get('hue/rules', {bridge: bridgeConfig.bridge, key: bridgeConfig.key})
+                .done( function(data) {
+                    var rules = JSON.parse(data);
+
+                    if(rules.length <= 0)
+                    {
+                        RED.notify(scope._("hue-rules.config.none-found"), "error");
+                    }
+
+                    // RESET OPTIONS
+                    $('#node-input-ruleid').empty();
+
+                    // SET TEMPERATURE SENSORS AS OPTIONS
+                    rules.forEach(function(rule)
+                    {
+                        $('#node-input-ruleid').append('<option value="' + rule.id + '">' + rule.name + '</option>');
+                    });
+
+                    // SELECT CURRENT VALUE
+                    $('#node-input-ruleid').val(current);
+                })
+                .fail(function()
+                {
+                    RED.notify(scope._("hue-rules.config.unknown-error"), "error");
+                });
+            }
+
+            $(document).on('change', '#node-input-ruleid', function()
+            {
+                var sensorName = $('#node-input-ruleid option:selected').text();
+                if(sensorName.length > 0)
+                {
+                    $('#node-input-name').val(sensorName);
+                }
+            });
+
+            $('#node-config-input-scan-rules').click(function()
+            {
+                if($('#node-input-ruleid').prop("tagName") === "INPUT")
+                {
+                    searchAndSelectRuleID();
+                } else {
+                    manualRuleID();
+                }
+            });
+        }
+    });
+</script>
